@@ -5,13 +5,13 @@
 function getElemPos(obj) {
   const target = $(obj);
   const pos = { top: 0, left: 0 };
-  if (target.css("position") === "fixed") {
+  if (target.css('position') === 'fixed') {
     pos.top =
-      (target.css("top") && target.css("top").replace("px", "")) -
+      (target.css('top') && target.css('top').replace('px', '')) -
       0 +
       window.pageYOffset;
     pos.left =
-      (target.css("left") && target.css("left").replace("px", "")) -
+      (target.css('left') && target.css('left').replace('px', '')) -
       0 +
       window.pageXOffset;
   } else {
@@ -145,17 +145,32 @@ function refTopToScreenBottom(ref) {
  * @param {*} css 对象
  */
 function cssSetter(target, css) {
-  if (css.left && $(target).css("position") !== "fixed") {
+  if (
+    css.left &&
+    css.position !== 'fixed' &&
+    $(target).css('position') !== 'fixed'
+  ) {
     css.left += window.pageXOffset;
   } else if (
     css.position &&
-    css.position !== "fixed" &&
-    $(target).css("position") === "fixed"
+    css.position === 'fixed' &&
+    $(target).css('position') !== 'fixed'
   ) {
     css.left =
       $(target)
-        .css("left")
-        .replace("px", "") -
+        .css('left')
+        .replace('px', '') -
+      0 -
+      window.pageXOffset;
+  } else if (
+    css.position &&
+    css.position !== 'fixed' &&
+    $(target).css('position') === 'fixed'
+  ) {
+    css.left =
+      $(target)
+        .css('left')
+        .replace('px', '') -
       0 +
       window.pageXOffset;
   }
@@ -168,9 +183,9 @@ function cssSetter(target, css) {
  */
 function scrollRegister(callback) {
   callback();
-  $(window).on("scroll", callback);
+  $(window).on('scroll', callback);
   return function() {
-    $(window).off("scroll", callback);
+    $(window).off('scroll', callback);
   };
 }
 
@@ -180,9 +195,9 @@ function scrollRegister(callback) {
  */
 function resizeRegister(callback) {
   callback();
-  $(window).on("resize", callback);
+  $(window).on('resize', callback);
   return function() {
-    $(window).off("resize", callback);
+    $(window).off('resize', callback);
   };
 }
 
@@ -198,13 +213,11 @@ function resizeRegister(callback) {
  */
 function alwaysStickLeft(init) {
   return function() {
-    const _ref = init.ref;
-    const _target = init.target;
     const padding = init.padding;
     const stickOver = init.stickOver;
 
-    const ref = $(_ref)[0];
-    const target = $(_target)[0];
+    const ref = $(init.ref)[0];
+    const target = $(init.target)[0];
     const targetWidth = refWidth(target);
     const refToScreenDistance = refLeftToScreenLeft(ref);
 
@@ -234,15 +247,12 @@ function alwaysStickLeft(init) {
  */
 function alwaysStickRight(init) {
   return function() {
-    const _ref = init.ref;
-    const _target = init.target;
     const padding = init.padding;
     const stickOver = init.stickOver;
 
-    const ref = $(_ref)[0];
-    const target = $(_target)[0];
+    const ref = $(init.ref)[0];
+    const target = $(init.target)[0];
     const targetWidth = refWidth(target);
-
     if (refRightToScreenRight(ref) > targetWidth + padding * 2) {
       cssSetter(target, {
         left: refRightToScreenLeft(ref) + padding
@@ -270,36 +280,41 @@ function alwaysStickRight(init) {
  */
 function yBetweenTwoRef(init) {
   return function() {
-    const _ref1 = init.ref1;
-    const _target = init.target;
-    const _ref2 = init.ref2;
     const padding = init.padding;
     const top = init.top;
 
-    const target = $(_target)[0];
-    const ref1 = $(_ref1)[0];
-    const ref2 = $(_ref2)[0];
-    const refToScreenDistance = refTopToScreenTop(target);
-    
+    const target = $(init.target)[0];
+    const ref1 = $(init.ref1)[0];
+    const ref2 = $(init.ref2)[0];
+    // 目标顶部到屏幕顶部的距离
+    const targetToScreenDistance = refTopToScreenTop(target);
+    const ref1ToTarget = ref1BottomToRef2Top(ref1, target);
+    const TargetToRef2 = ref1BottomToRef2Top(target, ref2);
     if (
-      !(refToScreenDistance < top) &&
-      ref1BottomToRef2Top(ref1, target) <= padding
+      // 靠住顶部
+      !(targetToScreenDistance < top) &&
+      ref1ToTarget <= padding
     ) {
       cssSetter(target, {
-        position: "absolute",
-        top: refHeight(ref1) + padding
+        position: 'absolute',
+        top: refHeight(ref1) + getElemPos(ref1).y + padding
       });
     } else if (
-      !(refToScreenDistance > top) &&
-      ref1BottomToRef2Top(target, ref2) <= padding
+      // 靠住底部
+      !(targetToScreenDistance > top) &&
+      TargetToRef2 <= padding
     ) {
       cssSetter(target, {
-        position: "absolute",
+        position: 'absolute',
         top: getElemPos(ref2).y - padding - refHeight(target)
       });
-    } else {
+    } else if (
+      (targetToScreenDistance <= top && ref1ToTarget <= padding) ||
+      TargetToRef2 <= padding
+    ) {
+      // 贴靠
       cssSetter(target, {
-        position: "fixed",
+        position: 'fixed',
         top: top
       });
     }
