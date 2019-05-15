@@ -292,7 +292,7 @@ function yBetweenTwoRef(init) {
     const TargetToRef2 = ref1BottomToRef2Top(target, ref2);
     if (
       // 靠住顶部
-      !(targetToScreenDistance < top) &&
+      targetToScreenDistance >= top &&
       ref1ToTarget <= padding
     ) {
       cssSetter(target, {
@@ -301,7 +301,7 @@ function yBetweenTwoRef(init) {
       });
     } else if (
       // 靠住底部
-      !(targetToScreenDistance > top) &&
+      targetToScreenDistance <= top &&
       TargetToRef2 <= padding
     ) {
       cssSetter(target, {
@@ -309,8 +309,8 @@ function yBetweenTwoRef(init) {
         top: getElemPos(ref2).y - padding - refHeight(target)
       });
     } else if (
-      (targetToScreenDistance <= top && ref1ToTarget <= padding) ||
-      TargetToRef2 <= padding
+      (targetToScreenDistance < top && ref1ToTarget >= padding) ||
+      (targetToScreenDistance > top && TargetToRef2 >= padding)
     ) {
       // 贴靠
       cssSetter(target, {
