@@ -1,3 +1,5 @@
+const { throttle } = require('./utils');
+
 /**
  * 获取dom的位置，返回{ x, y }
  * @param {*} obj
@@ -145,7 +147,9 @@ function refTopToScreenBottom(ref) {
  * @param {*} css 对象
  */
 function cssSetter(target, css) {
-  if (
+  if (css.position === 'unset') {
+    $(target).css({ position: 'unset', left: 'unset', top: 'unset' });
+  } else if (
     css.left &&
     css.position !== 'fixed' &&
     $(target).css('position') !== 'fixed'
@@ -178,13 +182,36 @@ function cssSetter(target, css) {
 }
 
 /**
+ * 缓存target的初始状态
+ * @param {*} target
+ */
+function cacheOriginPos(target) {
+  if (window.DM_STICKER_ORIGIN_POS_CACHE === undefined) {
+    const $target = $(target);
+    const position = $target.css('position') || 'unset';
+    const top = $target.css('top') || 'unset';
+    const left = $target.css('left') || 'unset';
+    window.DM_STICKER_ORIGIN_POS_CACHE = {
+      position,
+      top,
+      left,
+    };
+  }
+  return window.DM_STICKER_ORIGIN_POS_CACHE;
+}
+
+/**
  * 注册滚动事件，返回取消注册的函数
  * @param {*} callback
+ * @param Number 节流时间，默认为100ms
  */
-function scrollRegister(callback) {
+function scrollRegister(callback, delay = 100) {
+  if (!callback) return function () {};
+
   callback();
-  $(window).on('scroll', callback);
-  return function() {
+  const throttledCallback = throttle(delay, callback);
+  $(window).on('scroll', throttledCallback);
+  return function () {
     $(window).off('scroll', callback);
   };
 }
@@ -192,132 +219,16 @@ function scrollRegister(callback) {
 /**
  * 注册变化窗口大小时间，返回取消注册的函数
  * @param {*} callback
+ * @param Number 节流时间，默认为100ms
  */
-function resizeRegister(callback) {
+function resizeRegister(callback, delay = 100) {
+  if (!callback) return function () {};
+
   callback();
-  $(window).on('resize', callback);
-  return function() {
+  const throttledCallback = throttle(delay, callback);
+  $(window).on('resize', throttledCallback);
+  return function () {
     $(window).off('resize', callback);
-  };
-}
-
-//
-
-/**
- * 吸在参考左侧
- * @param {*} init init内的参数如下：
- * @param ref 参考
- * @param target 目标
- * @param padding 距离
- * @param stickOver 窗口宽度不足时是否覆盖到参考上
- */
-function alwaysStickLeft(init) {
-  return function() {
-    const padding = init.padding;
-    const stickOver = init.stickOver;
-
-    const ref = $(init.ref)[0];
-    const target = $(init.target)[0];
-    const targetWidth = refWidth(target);
-    const refToScreenDistance = refLeftToScreenLeft(ref);
-
-    if (refToScreenDistance > targetWidth + padding * 2) {
-      cssSetter(target, {
-        left: refToScreenDistance - targetWidth - padding
-      });
-    } else if (stickOver) {
-      cssSetter(target, {
-        left: padding
-      });
-    } else {
-      cssSetter(target, {
-        left: refToScreenDistance - targetWidth - padding
-      });
-    }
-  };
-}
-
-/**
- * 吸在参考右侧
- * @param {*} init init内的参数如下：
- * @param ref 参考
- * @param target 目标
- * @param padding 距离
- * @param stickOver 窗口宽度不足时是否覆盖到参考上
- */
-function alwaysStickRight(init) {
-  return function() {
-    const padding = init.padding;
-    const stickOver = init.stickOver;
-
-    const ref = $(init.ref)[0];
-    const target = $(init.target)[0];
-    const targetWidth = refWidth(target);
-    if (refRightToScreenRight(ref) > targetWidth + padding * 2) {
-      cssSetter(target, {
-        left: refRightToScreenLeft(ref) + padding
-      });
-    } else if (stickOver) {
-      cssSetter(target, {
-        left: windowWidth() - targetWidth - padding
-      });
-    } else {
-      cssSetter(target, {
-        left: refRightToScreenLeft(ref) + padding
-      });
-    }
-  };
-}
-
-/**
- * y轴方向，在ref1和ref2之间悬空
- * @param {*} init init内的参数如下：
- * @param ref1 上参考
- * @param target 目标
- * @param ref2 下参考
- * @param padding 距离
- * @param top 悬空时高度
- */
-function yBetweenTwoRef(init) {
-  return function() {
-    const padding = init.padding;
-    const top = init.top;
-
-    const target = $(init.target)[0];
-    const ref1 = $(init.ref1)[0];
-    const ref2 = $(init.ref2)[0];
-    // 目标顶部到屏幕顶部的距离
-    const targetToScreenDistance = refTopToScreenTop(target);
-    const ref1ToTarget = ref1BottomToRef2Top(ref1, target);
-    const TargetToRef2 = ref1BottomToRef2Top(target, ref2);
-    if (
-      // 靠住顶部
-      targetToScreenDistance >= top &&
-      ref1ToTarget <= padding
-    ) {
-      cssSetter(target, {
-        position: 'absolute',
-        top: refHeight(ref1) + getElemPos(ref1).y + padding
-      });
-    } else if (
-      // 靠住底部
-      targetToScreenDistance <= top &&
-      TargetToRef2 <= padding
-    ) {
-      cssSetter(target, {
-        position: 'absolute',
-        top: getElemPos(ref2).y - padding - refHeight(target)
-      });
-    } else if (
-      (targetToScreenDistance < top && ref1ToTarget >= padding) ||
-      (targetToScreenDistance > top && TargetToRef2 >= padding)
-    ) {
-      // 贴靠
-      cssSetter(target, {
-        position: 'fixed',
-        top: top
-      });
-    }
   };
 }
 
@@ -338,8 +249,6 @@ module.exports = {
   refTopToScreenBottom,
   cssSetter,
   scrollRegister,
-  alwaysStickLeft,
-  yBetweenTwoRef,
-  alwaysStickRight,
-  resizeRegister
+  resizeRegister,
+  cacheOriginPos,
 };
